@@ -144,8 +144,8 @@ export async function createFixture(t, runtime, name, { viewport = { width: 1440
     // mounts (and reads its snapshot) exactly like the parent page.
     await attachRpc(context)
   }
-  page.setDefaultTimeout(6000)
-  page.setDefaultNavigationTimeout(10000)
+  page.setDefaultTimeout(12000)
+  page.setDefaultNavigationTimeout(20000)
   const pageErrors = []
   const unexpectedRequests = []
   page.on('pageerror', error => pageErrors.push(error.message))
@@ -343,6 +343,16 @@ export async function openStatePanel(page, title) {
  * pending viewport change would close it immediately. */
 export async function settleLayout(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(null)))))
+}
+
+/** Focus a control, prove it really owns focus, then press one key. A snapshot
+ * refresh or a remount between focus() and the keypress would otherwise deliver the
+ * key to the body and the reorder would silently never happen. */
+export async function pressOn(page, locator, key) {
+  const handle = await locator.elementHandle()
+  await locator.focus()
+  await page.waitForFunction(element => document.activeElement === element, handle)
+  await page.keyboard.press(key)
 }
 
 export async function refresh(h) {

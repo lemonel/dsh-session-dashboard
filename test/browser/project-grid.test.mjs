@@ -2,7 +2,7 @@ import test, { after, before } from 'node:test'
 import assert from 'node:assert/strict'
 import { EMPTY } from '../../lib/shared/model.js'
 import {
-  createBrowserRuntime, createFixture, mutation, sessionObservation,
+  createBrowserRuntime, createFixture, mutation, pressOn, sessionObservation,
 } from '../tools/browser-harness.mjs'
 
 let runtime
@@ -347,10 +347,10 @@ test('dragging a project grip previews the drop layout, and the arrow keys remai
   await page.mouse.up()
   await expectOrder([ids[5], ids[1], ids[2], ids[0], ids[3], ids[4]])
 
-  await page.locator(`[data-project-id="${ids[0]}"] .sd-projectcard-head .sd-projectgrip`).focus()
-  await page.keyboard.press('ArrowLeft')
+  const grip = page.locator(`[data-project-id="${ids[0]}"] .sd-projectcard-head .sd-projectgrip`)
+  await pressOn(page, grip, 'ArrowLeft')
   await expectOrder([ids[5], ids[1], ids[0], ids[2], ids[3], ids[4]])
-  await page.keyboard.press('ArrowRight')
+  await pressOn(page, grip, 'ArrowRight')
   await expectOrder([ids[5], ids[1], ids[2], ids[0], ids[3], ids[4]])
 
   assert.equal(h.board().cards.length, 2, 'reordering keeps every session card')
