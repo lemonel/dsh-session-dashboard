@@ -8,6 +8,10 @@ import { attentionDetail, attentionKind, attentionLabel, attentionTone, canPickS
 interface StateOption { value: string; label: string; color: string; checked: boolean }
 interface PanelRect { right: number; minWidth: number; top?: number; bottom?: number }
 
+/** A resize or scroll that lands in the first moment after the panel opened is the
+ *  layout settling (or the panel's own focus scroll), not the user moving away. */
+const SWALLOWED_DISMISS_MS = 250
+
 /** The plain, non-interactive face: the status name with its colour dot. Used by
  *  read-only cards and by the details drawer, so every surface paints one status
  *  the same way. */
@@ -55,6 +59,7 @@ export function StateControl({ board, card, onChangeState, onReviewState, label,
   const [changing, setChanging] = useState(false)
   const [rect, setRect] = useState<PanelRect | null>(null)
   const trigger = useRef<HTMLButtonElement>(null), panel = useRef<HTMLDivElement>(null)
+  const openedAt = useRef(0)
   const id = useId()
   const name = label ?? t('changeStateFor', { title: card.titleOverride || card.hostTitle || card.sessionId })
   const statusText = status.label
@@ -89,6 +94,7 @@ export function StateControl({ board, card, onChangeState, onReviewState, label,
     if (!editable || changing) return
     const next = measure()
     if (!next) return
+    openedAt.current = Date.now()
     setRect(next); setActive(selected >= 0 ? selected : 0); setOpen(true)
   }
   useEffect(() => { if (!editable) { setOpen(false); setRect(null) } }, [editable])
@@ -96,8 +102,12 @@ export function StateControl({ board, card, onChangeState, onReviewState, label,
     if (!open) return
     panel.current?.focus({ preventScroll: true })
     const pointer = (event: Event) => { const target = event.target as Node | null; if (!panel.current?.contains(target) && !trigger.current?.contains(target)) close(false) }
-    const dismiss = () => close(false)
-    const scroll = (event: Event) => { if (!panel.current?.contains(event.target as Node | null)) close(false) }
+    // A layout settle that lands right after the panel opened (a viewport change, or
+    // the focus scroll the panel itself causes) must not dismiss the choice the user
+    // just opened: only a later resize or scroll is a real reason to close.
+    const settled = () => Date.now() - openedAt.current >= SWALLOWED_DISMISS_MS
+    const dismiss = () => { if (settled()) close(false) }
+    const scroll = (event: Event) => { if (settled() && !panel.current?.contains(event.target as Node | null)) close(false) }
     document.addEventListener('pointerdown', pointer, true)
     window.addEventListener('resize', dismiss)
     window.addEventListener('scroll', scroll, true)
