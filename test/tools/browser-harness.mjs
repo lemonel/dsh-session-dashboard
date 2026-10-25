@@ -349,7 +349,11 @@ export async function settleLayout(page) {
  * refresh or a remount between focus() and the keypress would otherwise deliver the
  * key to the body and the reorder would silently never happen. */
 export async function pressOn(page, locator, key) {
+  await locator.waitFor()
   const handle = await locator.elementHandle()
+  // A control that is busy (a failing write still settling) refuses focus and would
+  // swallow the key; a panel that is still open would interpret the key as a pick.
+  await page.waitForFunction(element => Boolean(element) && element.isConnected && element.disabled !== true && element.getAttribute('aria-expanded') !== 'true', handle)
   await locator.focus()
   await page.waitForFunction(element => document.activeElement === element, handle)
   await page.keyboard.press(key)

@@ -157,7 +157,7 @@ test('narrow English project and state picker stay keyboard operable and fail cl
   await mutation(h, 'review', () => panel.getByRole('option', { name: statuses[2].name, exact: true }).click(), { ok: false })
   assert.equal(h.card('work').decision, null)
   h.allowDatabaseWrites()
-  await chip.focus(); await page.keyboard.press('Enter')
+  await pressOn(page, chip, 'Enter')
   const retry = page.getByRole('listbox', { name: 'Change state: Keyboard work', exact: true })
   await retry.waitFor()
   await mutation(h, 'review', () => retry.getByRole('option', { name: statuses[2].name, exact: true }).click())
