@@ -1,0 +1,67 @@
+name: Session Dashboard Release
+
+# Tags are the only release trigger. Branch pushes and pull requests run ci.yml;
+# this workflow never publishes to npm, so a GitHub Release stays a manual decision
+# expressed by pushing the tag.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify the tag, manifest and lockfile agree
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs'
+            const tag = process.argv[1]
+            const manifest = JSON.parse(readFileSync('package.json', 'utf8'))
+            const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'))
+            if (tag !== manifest.version) throw new Error('tag ' + tag + ' does not match package.json ' + manifest.version)
+            if (lock.version !== manifest.version) throw new Error('lockfile version does not match package.json')
+            if (lock.packages['']?.version !== manifest.version) throw new Error('lockfile root version does not match package.json')
+          " "$tag"
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      # Reuse the same checks as CI before creating anything public.
+      - run: npm test
+      - run: npm run check:package
+      - run: npm run verify:clean
+      - name: Pack the verified tree
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          npm pack --ignore-scripts --pack-destination release
+          asset=$(find release -maxdepth 1 -name '*.tgz' -print -quit)
+          test -n "$asset"
+          # The asset name stays free of the version so latest/download/ keeps working.
+          cp "$asset" release/hsx-dsh-session-dashboard.tgz
+          echo "ASSET=$GITHUB_WORKSPACE/release/hsx-dsh-session-dashboard.tgz" >> "$GITHUB_ENV"
+      - name: Install the packed archive in isolation
+        run: npm run verify:install -- "$ASSET"
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          flags=()
+          case "${GITHUB_REF_NAME}" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "${GITHUB_REF_NAME}" "$ASSET" \
+            --title "Session Dashboard ${GITHUB_REF_NAME#v}" \
+            --generate-notes "${flags[@]}"

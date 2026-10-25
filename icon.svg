@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none" role="img" aria-labelledby="sd-avatar-title sd-avatar-description">
+  <title id="sd-avatar-title">会话仪表板 / Session Dashboard</title>
+  <desc id="sd-avatar-description">深蓝色圆角背景上的项目卡片与勾选标记，表达按项目组织会话、跟踪不同进度并完成人工验收。 / Project cards and a check mark on a deep blue rounded background: organize sessions by project, track progress and accept work.</desc>
+  <defs>
+    <linearGradient id="sd-avatar-background" x1="20" y1="0" x2="232" y2="256" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#253557"/>
+      <stop offset="1" stop-color="#111B30"/>
+    </linearGradient>
+    <linearGradient id="sd-avatar-blue" x1="38" y1="84" x2="82" y2="136" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A4BDFF"/>
+      <stop offset="1" stop-color="#7B9DF5"/>
+    </linearGradient>
+    <linearGradient id="sd-avatar-amber" x1="106" y1="84" x2="150" y2="166" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE0A7"/>
+      <stop offset="1" stop-color="#F2B96A"/>
+    </linearGradient>
+    <linearGradient id="sd-avatar-mint" x1="174" y1="84" x2="218" y2="136" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A0F0D4"/>
+      <stop offset="1" stop-color="#63D5B0"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#sd-avatar-background)"/>
+  <rect x="1" y="1" width="254" height="254" rx="55" stroke="#DCE8FF" stroke-opacity=".12" stroke-width="2"/>
+  <rect x="32" y="48" width="56" height="160" rx="16" fill="#9AB6FF" fill-opacity=".09"/>
+  <rect x="100" y="48" width="56" height="160" rx="16" fill="#FFD89A" fill-opacity=".08"/>
+  <rect x="168" y="48" width="56" height="160" rx="16" fill="#8FE8C8" fill-opacity=".08"/>
+  <rect x="44" y="62" width="32" height="8" rx="4" fill="#A4BDFF"/>
+  <rect x="112" y="62" width="32" height="8" rx="4" fill="#FFDA9B"/>
+  <rect x="180" y="62" width="32" height="8" rx="4" fill="#92E8C9"/>
+  <rect x="38" y="84" width="44" height="52" rx="10" fill="url(#sd-avatar-blue)"/>
+  <rect x="48" y="99" width="24" height="5" rx="2.5" fill="#29477B" fill-opacity=".58"/>
+  <rect x="48" y="110" width="16" height="5" rx="2.5" fill="#29477B" fill-opacity=".36"/>
+  <rect x="38" y="146" width="44" height="46" rx="10" fill="#8EACFA" fill-opacity=".48"/>
+  <rect x="48" y="160" width="24" height="5" rx="2.5" fill="#DCE7FF" fill-opacity=".62"/>
+  <rect x="48" y="171" width="16" height="5" rx="2.5" fill="#DCE7FF" fill-opacity=".36"/>
+  <rect x="106" y="84" width="44" height="82" rx="10" fill="url(#sd-avatar-amber)"/>
+  <rect x="116" y="99" width="24" height="5" rx="2.5" fill="#78532C" fill-opacity=".57"/>
+  <rect x="116" y="110" width="16" height="5" rx="2.5" fill="#78532C" fill-opacity=".34"/>
+  <path d="M119 144H137" stroke="#78532C" stroke-opacity=".35" stroke-width="5" stroke-linecap="round"/>
+  <rect x="174" y="84" width="44" height="52" rx="10" fill="url(#sd-avatar-mint)"/>
+  <path d="m185 109 8 8 14-16" stroke="#205A4B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="174" y="146" width="44" height="30" rx="10" fill="#86DFC0" fill-opacity=".28"/>
+</svg>

@@ -1,0 +1,86 @@
+name: Session Dashboard CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    name: Native ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - run: npm test
+      - run: npm run check:package
+      - name: Locked clean source rebuild and regression
+        run: npm run verify:clean
+      - name: Prebuilt production-only isolated install
+        shell: pwsh
+        run: |
+          $packed = npm pack --ignore-scripts --json | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not $packed.filename) { throw 'npm pack did not return an archive filename' }
+          npm run verify:install -- $packed.filename
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - id: chrome
+        uses: browser-actions/setup-chrome@v1
+      - name: Native Chrome interaction and persistence
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+        run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dashboard-browser-${{ matrix.os }}-node-${{ matrix.node }}
+          path: artifacts/browser
+          if-no-files-found: ignore
+  compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+        dsh:
+          - '0.2.0-rc.1'
+          - '0.2.0-rc.2'
+          - '0.2.1-alpha.1'
+          - '0.2.1-alpha.2'
+          - '0.2.1-alpha.3'
+          - '0.2.1-alpha.4'
+          - '0.2.1-rc.1'
+          - '0.2.1-rc.2'
+          - '0.2.1-rc.3'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - id: chrome
+        uses: browser-actions/setup-chrome@v1
+      - name: Isolated exact SDK surface, behavior and native Chrome
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+        run: npm run test:matrix -- '${{ matrix.dsh }}' --browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dashboard-compat-node-${{ matrix.node }}-dsh-${{ matrix.dsh }}
+          path: |
+            artifacts/compatibility.json
+            /tmp/session-dashboard-matrix-*/${{ matrix.dsh }}/artifacts/matrix
+            /tmp/session-dashboard-matrix-*/${{ matrix.dsh }}/artifacts/browser
+          if-no-files-found: warn

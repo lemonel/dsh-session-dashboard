@@ -1,0 +1,7 @@
+{
+  "id": "hello.extension",
+  "name": "Hello 扩展示例",
+  "version": "0.1.0",
+  "description": "最小可用的仪表板扩展：每行一个静态 chip，演示能力声明与 facet 契约。",
+  "requires": ["card.facet.v1"]
+}
