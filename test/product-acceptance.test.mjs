@@ -259,7 +259,6 @@ test('A17/A21 pending never-executed input blocks selection; same-scope reload r
   const frozenEnvelope = mutationFor(firstService, ownEdit(saved.cards[0], { progress: 'Old epoch with every CAS unchanged' }))
   await firstService.close()
   const reopened = new SqliteBoardStore(epochPath), replacement = new DashboardService(reopened, createDshHost(h.ctx))
-  t.after(() => replacement.close())
   // Order revisions are derived from the single durable tag order, so compare the
   // durable row and every persisted field rather than the writer's working copy.
   assert.deepEqual(reopened.identity(), scope)
@@ -274,4 +273,7 @@ test('A17/A21 pending never-executed input blocks selection; same-scope reload r
   await assert.rejects(replacement.mutate(committed), error => error.code === 'UNAVAILABLE')
   assert.deepEqual(reopened.read().cards, saved.cards, 'old epoch cannot mutate or replay a durable receipt before reinspection')
   assert.equal(h.adapter.requests.length, 0)
+  // Close before the workspace teardown runs: Windows refuses to unlink an open
+  // SQLite file, and after hooks run in registration order.
+  await replacement.close()
 })

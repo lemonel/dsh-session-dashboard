@@ -10,7 +10,7 @@ import { unknownRuntime } from '../lib/shared/model.js'
 
 function pathFor(t) {
   const root = mkdtempSync(join(tmpdir(), 'session-dashboard-bootstrap-'))
-  t.after(() => rmSync(root, { recursive: true, force: false }))
+  t.after(() => rmSync(root, { recursive: true, force: false, maxRetries: 10, retryDelay: 50 }))
   return join(root, 'dashboard.sqlite')
 }
 function pendingCard() {
@@ -63,8 +63,8 @@ test('a brand-new database creates the complete v11 schema and serves board plus
 
   store.close()
   const reopened = new SqliteBoardStore(path, 'fresh-profile')
-  t.after(() => reopened.close())
   assert.equal(reopened.read().schemaVersion, 11)
   assert.equal(reopened.read().cards[0].status, 'accepted')
   assert.equal(reopened.history({ sessionId: 'boot', membershipId: added.membershipId, limit: 10 }).records[0].kind, 'accepted')
+  reopened.close()
 })

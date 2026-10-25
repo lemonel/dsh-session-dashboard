@@ -458,7 +458,9 @@ test('a short status chip hugs its label, left-aligns the name and keeps the car
   })
   assert.ok(metrics.width < 100, `a short status must not reserve the old fixed width: ${JSON.stringify(metrics)}`)
   assert.equal(metrics.maxWidth, '128px', 'long labels still clamp at 128px')
-  assert.equal(metrics.justify, 'flex-start', 'the chip content is left-aligned')
+  // Chrome reports the flex-start keyword as flow-start once the alignment grammar
+  // is the CSS Box Alignment one; both spellings mean left-aligned content.
+  assert.ok(['flex-start', 'flow-start', 'start'].includes(metrics.justify), `the chip content is left-aligned: ${JSON.stringify(metrics)}`)
   assert.ok(metrics.nameLeft <= 12, `the status name starts at the chip's left edge: ${JSON.stringify(metrics)}`)
   assert.ok(metrics.caretRight >= 0 && metrics.caretRight <= 14, `the caret stays at the chip's right side: ${JSON.stringify(metrics)}`)
 })

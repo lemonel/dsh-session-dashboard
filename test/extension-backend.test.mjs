@@ -29,7 +29,7 @@ function pathFor(t) {
   t.after(() => {
     const canonical = realpathSync(root), parent = realpathSync(tmpdir())
     assert.equal(dirname(canonical), parent); assert(canonical.startsWith(join(parent, 'session-dashboard-extension-')))
-    rmSync(canonical, { recursive: true, force: false })
+    rmSync(canonical, { recursive: true, force: false, maxRetries: 10, retryDelay: 50 })
   })
   return join(root, 'dashboard.sqlite')
 }
@@ -40,10 +40,11 @@ test('an older schema is refused with an actionable upgrade message and left unt
   db.close()
   const before = new DatabaseSync(path), raw = before.prepare('SELECT * FROM board').get(); before.close()
   assert.throws(() => new SqliteBoardStore(path, 'profile-one'), error => error.code === 'STORAGE' && /0\.6\.7/.test(error.message))
-  const after = new DatabaseSync(path); t.after(() => after.close())
+  const after = new DatabaseSync(path)
   assert.deepEqual(after.prepare('SELECT * FROM board').get(), raw)
   assert.equal(after.prepare('PRAGMA user_version').get().user_version, 7)
   assert.equal(after.prepare("SELECT name FROM sqlite_master WHERE name='dashboard_meta'").get(), undefined)
+  after.close()
 })
 
 test('future database versions and cross-profile reuse are rejected without rotating the valid store scope', t => {
@@ -52,8 +53,9 @@ test('future database versions and cross-profile reuse are rejected without rota
   const reopened = new SqliteBoardStore(path, 'profile-one'); assert.deepEqual(reopened.identity(), identity); reopened.close()
   const db = new DatabaseSync(path); db.exec('PRAGMA user_version=99'); db.close()
   assert.throws(() => new SqliteBoardStore(path, 'profile-one'), /不支持/)
-  const inspect = new DatabaseSync(path); t.after(() => inspect.close())
+  const inspect = new DatabaseSync(path)
   assert.equal(inspect.prepare('PRAGMA user_version').get().user_version, 99)
+  inspect.close()
 })
 
 test('final authority rejection rolls back source watermark, events, board and receipt atomically', t => {
@@ -138,14 +140,14 @@ test('tampered persisted source and event payload hashes fail closed without rep
   db.prepare('UPDATE memberships SET source=? WHERE id=?').run('{"tampered":"source"}', member)
   const original = db.prepare('SELECT source, source_digest FROM memberships WHERE id=?').get(member)
   db.close()
-  const reopened = new SqliteBoardStore(path, 'tamper-profile'); t.after(() => reopened.close())
+  const reopened = new SqliteBoardStore(path, 'tamper-profile')
   assert.throws(() => reopened.snapshot(), error => error.code === 'STORAGE' && /游标校验/.test(error.message))
   const inspector = new DatabaseSync(path)
   assert.deepEqual(inspector.prepare('SELECT source, source_digest FROM memberships WHERE id=?').get(member), original)
   inspector.prepare('UPDATE domain_events SET payload=? WHERE seq=1').run('{"tampered":"event"}')
   assert.throws(() => reopened.events(0, 100), error => error.code === 'STORAGE' && /事件完整性/.test(error.message))
   assert.equal(inspector.prepare('SELECT payload FROM domain_events WHERE seq=1').get().payload, '{"tampered":"event"}')
-  inspector.close()
+  inspector.close(); reopened.close()
 })
 
 test('actual Cordis service tracker binds independent read leases to real registering plugin lifetimes', async t => {

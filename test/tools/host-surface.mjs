@@ -34,7 +34,7 @@ export async function localPackage(nodeModules, name) {
   let directory, manifest
   try {
     directory = await realpath(target)
-    if (!inside(nodeModules, directory)) throw problem('OUTSIDE_HOST_ROOT', `${name} resolves outside the selected SDK tree: ${directory}`)
+    if (!inside(await realpath(nodeModules), directory)) throw problem('OUTSIDE_HOST_ROOT', `${name} resolves outside the selected SDK tree: ${directory}`)
     manifest = JSON.parse(await readFile(join(directory, 'package.json'), 'utf8'))
   } catch (error) {
     if (error.code === 'OUTSIDE_HOST_ROOT') throw error
@@ -46,6 +46,9 @@ export async function localPackage(nodeModules, name) {
 
 /** All nested DSH packages count, not only whichever copy happened to resolve first. */
 export async function inspectInstalledTree(nodeModules, expectedVersion) {
+  // Containment must compare canonical paths: macOS turns /var into /private/var and
+  // a Windows 8.3 prefix (RUNNER~1) never equals the realpath of its children.
+  const root = await realpath(nodeModules).catch(error => { throw problem('MISSING_DEPENDENCY', `SDK node_modules does not exist at ${nodeModules}: ${error.message}`) })
   const packages = []
   const seen = new Set()
   async function visit(directory) {
@@ -55,7 +58,7 @@ export async function inspectInstalledTree(nodeModules, expectedVersion) {
       if (entry.name.startsWith('@')) { await visit(join(directory, entry.name)); continue }
       if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
       const path = await realpath(join(directory, entry.name))
-      if (!inside(nodeModules, path)) throw problem('OUTSIDE_HOST_ROOT', `An installed package escapes the SDK root: ${path}`)
+      if (!inside(root, path)) throw problem('OUTSIDE_HOST_ROOT', `An installed package escapes the SDK root: ${path}`)
       if (seen.has(path)) continue
       seen.add(path)
       let manifest
@@ -69,7 +72,7 @@ export async function inspectInstalledTree(nodeModules, expectedVersion) {
       await visit(join(path, 'node_modules'))
     }
   }
-  await visit(nodeModules)
+  await visit(root)
   if (!packages.length) throw problem('MISSING_DEPENDENCY', `No DSH packages found in ${nodeModules}`)
   return packages
 }

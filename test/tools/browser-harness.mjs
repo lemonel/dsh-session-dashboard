@@ -338,6 +338,13 @@ export async function openStatePanel(page, title) {
   return panel
 }
 
+/** A viewport or locale change lands asynchronously. Let the resize and the render
+ * settle first: the panel dismisses on a resize, so opening it in the same tick as a
+ * pending viewport change would close it immediately. */
+export async function settleLayout(page) {
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(null)))))
+}
+
 export async function refresh(h) {
   const next = h.nextCall(call => call.method === 'snapshot')
   // A modal deliberately blocks toolbar clicks. In that case use the actual
@@ -402,7 +409,12 @@ export async function pickWorkspaceAndCreate(h, { title, prompt } = {}) {
   const radio = title === undefined ? dialog.getByRole('radio').first() : dialog.getByRole('radio', { name: title, exact: true })
   await radio.check()
   if (prompt !== undefined) await dialog.getByLabel('启动内容（可选）', { exact: true }).fill(prompt)
-  return mutation(h, 'add_card', () => dialog.getByRole('button', { name: '在这里新建', exact: true }).click())
+  const result = await mutation(h, 'add_card', () => dialog.getByRole('button', { name: '在这里新建', exact: true }).click())
+  // Creation dismisses the native New Session overlay asynchronously. A slower host
+  // (isolated install or CI) would otherwise keep its pending frame over the board and
+  // swallow the next click, so wait for the overlay to go before reporting success.
+  await dialog.waitFor({ state: 'hidden', timeout: 10000 })
+  return result
 }
 
 /** Close the floating preview if creation opened one. */

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, readdir, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, realpath, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,7 +17,7 @@ test('npm child launch preserves literal arguments, input, stdio and failure sta
   try {
     const args = ['artifact with spaces.tgz', '标签', 'a&b|c', '$(not-a-command)', '"quoted"', '%PATH%'], options = { cwd: directory, encoding: 'utf8', input: 'literal stdin', env: { ...process.env, LAUNCHER_TEST_MARKER: 'kept' }, stdio: ['pipe', 'pipe', 'pipe'], shell: true }
     const direct = JSON.parse(npmExecFileSync(args, options))
-    assert.deepEqual(direct, { args, cwd: directory, input: 'literal stdin', marker: 'kept' })
+    assert.deepEqual(direct, { args, cwd: await realpath(directory), input: 'literal stdin', marker: 'kept' })
     const spawned = npmSpawnSync(args, options)
     assert.equal(spawned.status, 0); assert.equal(spawned.error, undefined); assert.equal(spawned.signal, null)
     assert.deepEqual(JSON.parse(spawned.stdout), direct); assert.match(spawned.stderr, /fixture stderr/)

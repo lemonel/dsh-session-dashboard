@@ -8,7 +8,7 @@ function setSource(h, id, value) {
   h.host.set(id, value, false)
   h.host.setSource(id, replayFixture(id, value.runtime))
 }
-import { closePreview, createBrowserRuntime, createFixture, expectCardStatus, openStatePanel, projectDropNative, sessionObservation, refresh, mutation, openProjectDrop, pickWorkspaceAndCreate, prepareNewSession, confirmReviewCard } from '../tools/browser-harness.mjs'
+import { closePreview, createBrowserRuntime, createFixture, expectCardStatus, openStatePanel, projectDropNative, sessionObservation, refresh, mutation, openProjectDrop, pickWorkspaceAndCreate, prepareNewSession, confirmReviewCard, settleLayout } from '../tools/browser-harness.mjs'
 
 let runtime
 before(async () => { runtime = await createBrowserRuntime() })
@@ -148,6 +148,7 @@ test('narrow English project and state picker stay keyboard operable and fail cl
   await page.getByRole('button', { name: '会话行操作：Keyboard work', exact: true }).waitFor()
   await page.setViewportSize({ width: 700, height: 800 })
   await page.evaluate(() => window.dashboardFixture.setLocale('en'))
+  await settleLayout(page)
   const chip = page.getByRole('button', { name: 'Change state: Keyboard work', exact: true })
   await chip.focus(); await page.keyboard.press('Enter')
   const panel = page.getByRole('listbox', { name: 'Change state: Keyboard work', exact: true })
