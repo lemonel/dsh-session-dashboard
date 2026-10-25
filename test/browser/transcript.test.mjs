@@ -139,8 +139,9 @@ test('the preview opens from the project row title and keeps its read-only entry
   assert.deepEqual(await popup.evaluate(() => window.dashboardFixture.panelSelections), [null], 'the native conversation becomes the active panel')
   assert.deepEqual(await popup.evaluate(() => window.dashboardFixture.failures), [], 'the new tab reports no plugin errors')
   // A catalogue event can be published before native retention reports the reveal
-  // the tab just made. The tab must wait out its settle window instead of repeating
-  // the same open; only a genuinely different Session is corrected.
+  // the tab just made, and a restore can briefly clear the panel. A missing
+  // projection is not a competing choice, so it never repeats the same open; only
+  // a genuinely different Session is corrected.
   await popup.evaluate(() => window.dashboardFixture.bootRestore(null))
   await popup.waitForTimeout(700)
   assert.deepEqual(await popup.evaluate(() => window.dashboardFixture.openSessionCalls), ['preview-session'], 'a stale catalogue event never repeats the same reveal')

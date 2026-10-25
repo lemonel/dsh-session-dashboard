@@ -6,9 +6,6 @@ import { layoutController, sessionCatalogue, shownSession, type SessionCatalogue
  *  corrects a late boot restore. It is a normal page rather than a preview frame,
  *  so it keeps the more generous ten-second window. */
 const SESSION_OPEN_RECONCILE_MS = 10_000
-/** Catalogue events may arrive before the native retention projects the reveal we
- *  just made; wait this long before treating a missing selection as a real loss. */
-const SESSION_OPEN_SETTLE_MS = 500
 
 /** A new tab opened from a preview is a normal plugin page, but it must also reveal
  *  the Session the link named. Wait for the cold catalogue, then correct a late
@@ -18,7 +15,6 @@ export function revealLinkedSession(ctx: Context, target: string): void {
     child.effect(() => {
       let finished = false
       let revealed = false
-      let revealedAt = 0
       let timer: ReturnType<typeof setTimeout> | undefined
       let unsubscribe: (() => void) | undefined
       const deadline = Date.now() + SESSION_OPEN_RECONCILE_MS
@@ -70,19 +66,16 @@ export function revealLinkedSession(ctx: Context, target: string): void {
         // Do not re-open on every catalogue event once the requested Session is
         // already the one this tab renders; only a later boot restore is corrected.
         if (revealed) {
-          if (current === target) return
           // A real host can publish a catalogue event before its native retention
-          // reports the reveal we just made. Re-judging in that gap would duplicate
-          // one open, so wait out a short settle window first; a different Session
-          // is still corrected immediately below.
-          if (current === null) {
-            if (Date.now() - revealedAt < SESSION_OPEN_SETTLE_MS) schedule(150)
-            return
-          }
+          // reports the reveal we just made, and a restore can briefly clear the
+          // panel. A missing projection is not a competing choice: only a concrete
+          // different Session is worth correcting, otherwise one link becomes two
+          // opens (and visibly re-opens) on a slow start.
+          if (current === target || current === null) return
         }
         try {
           child.uiWorkspace.openSession(target as SessionId)
-          revealed = true; revealedAt = Date.now()
+          revealed = true
         } catch {
           // The id can appear between the snapshot and the call; retry the wait
           // instead of spamming openSession.
