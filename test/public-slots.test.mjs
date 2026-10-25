@@ -41,7 +41,7 @@ export const scope: DashboardSlotContext['entry'] = 'board'
     assert.equal(manifest.exports['./slots'].default, './lib/frontend/public_slots.js')
   } finally {
     const target = await realpath(directory)
-    assert.equal(dirname(target), resolve(root, 'test'))
+    assert.equal(dirname(target), await realpath(resolve(root, 'test')))
     assert.match(target.slice(dirname(target).length + 1), /^\.public-slot-consumer-/)
     await rm(target, { recursive: true, force: true })
   }

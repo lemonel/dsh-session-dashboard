@@ -317,7 +317,7 @@ export async function openRowMenu(page, title, bucket = 'unassigned') {
   const trigger = page.getByRole('button', { name: `会话行操作：${title}`, exact: true })
   // A project row is already visible in the default expansion; bucket rows need theirs opened.
   if (await trigger.count() === 0) await expandBucket(page, bucket)
-  if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click()
+  if (await trigger.getAttribute('aria-expanded') !== 'true') { await waitUncovered(page, trigger); await trigger.click() }
   const panel = page.getByRole('group', { name: `会话行操作：${title}`, exact: true })
   await panel.waitFor()
   return panel
@@ -353,6 +353,20 @@ export async function pressOn(page, locator, key) {
   await locator.focus()
   await page.waitForFunction(element => document.activeElement === element, handle)
   await page.keyboard.press(key)
+}
+
+/** Wait until the control is the element a pointer would actually hit. A preview or
+ * New Session overlay that is still opening (or still being dismissed) covers the
+ * board for a while on a slow host, and a click sent into it silently goes nowhere. */
+export async function waitUncovered(page, locator) {
+  const handle = await locator.elementHandle()
+  await page.waitForFunction(element => {
+    if (!element || !element.isConnected) return false
+    const rect = element.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) return false
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+    return Boolean(hit) && (element === hit || element.contains(hit) || hit.contains(element))
+  }, handle)
 }
 
 export async function refresh(h) {
@@ -429,10 +443,18 @@ export async function pickWorkspaceAndCreate(h, { title, prompt } = {}) {
 
 /** Close the floating preview if creation opened one. */
 export async function closePreview(page) {
-  const preview = page.getByRole('dialog', { name: '预览会话', exact: true })
-  if (await preview.count() === 0) return
-  await preview.getByRole('button', { name: '关闭预览会话', exact: true }).click()
-  await page.locator('[data-preview-cache]').waitFor({ state: 'hidden' })
+  // Creation can open the preview slightly after the notice, and a second window may
+  // follow a first close, so keep closing while a visible preview is still up.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const preview = page.getByRole('dialog', { name: '预览会话', exact: true })
+    if (await preview.count() === 0 || !(await preview.isVisible())) break
+    const close = preview.getByRole('button', { name: '关闭预览会话', exact: true })
+    if (await close.count() === 0) break
+    await close.click()
+    await page.locator('[data-preview-cache]').waitFor({ state: 'hidden' })
+    await settleLayout(page)
+  }
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-preview-cache]')].every(node => node.hasAttribute('hidden')))
 }
 
 /** Join a seeded Host Session to a project through the dashboard's only creation
@@ -462,6 +484,7 @@ export async function addCard(h, { title, project }) {
   await closePreview(page)
   const trigger = page.getByRole('button', { name: `会话行操作：${title}`, exact: true })
   await trigger.waitFor({ timeout: 8000 })
+  await waitUncovered(page, trigger)
   await trigger.click()
   await page.getByRole('group', { name: `会话行操作：${title}`, exact: true }).getByRole('button', { name: '会话详情', exact: true }).click()
   const details = page.getByRole('dialog', { name: '会话详情', exact: true })
