@@ -359,12 +359,17 @@ export async function pressOn(page, locator, key) {
  * New Session overlay that is still opening (or still being dismissed) covers the
  * board for a while on a slow host, and a click sent into it silently goes nowhere. */
 export async function waitUncovered(page, locator) {
+  await locator.scrollIntoViewIfNeeded()
   const handle = await locator.elementHandle()
   await page.waitForFunction(element => {
     if (!element || !element.isConnected) return false
     const rect = element.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return false
-    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+    const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2
+    // A row far below the fold has no hit point at all; bring it into view first
+    // instead of waiting for an overlay that is not the problem.
+    if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) { element.scrollIntoView({ block: 'center', inline: 'center' }); return false }
+    const hit = document.elementFromPoint(x, y)
     return Boolean(hit) && (element === hit || element.contains(hit) || hit.contains(element))
   }, handle)
 }
