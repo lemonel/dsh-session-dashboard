@@ -67,7 +67,7 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && node build.mjs",
     "test": "npm run build && node --test test/*.test.mjs",
-    "test:browser": "npm run build && node --test test/browser/*.test.mjs",
+    "test:browser": "npm run build && node test/tools/browser-suite.mjs",
     "check:package": "node test/tools/check-package.mjs",
     "verify:clean": "node test/tools/verify-clean.mjs",
     "verify:install": "node test/tools/verify-install.mjs",

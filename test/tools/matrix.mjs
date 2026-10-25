@@ -222,7 +222,7 @@ export async function runMatrix(options = {}) {
         row.nodeBehavior = tests.passed ? 'passed' : 'failed'
         if (options.browser) {
           row.browserTestFiles = await testFiles(join(rowDirectory, 'test/browser'), true)
-          await run(process.execPath, ['--test', '--test-timeout=180000', '--test-reporter=tap', ...row.browserTestFiles], 'chrome-tests')
+          await run(process.execPath, [join(rowDirectory, 'test/tools/browser-suite.mjs'), ...row.browserTestFiles], 'chrome-tests')
           row.browser = 'passed'
         }
         row.status = 'passed'
