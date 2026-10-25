@@ -74,9 +74,13 @@ export function revealLinkedSession(ctx: Context, target: string): void {
           if (current === target || current === null) return
         }
         try {
-          child.uiWorkspace.openSession(target as SessionId)
+          // Claim the reveal before the call: the host republishes its catalogue from
+          // inside openSession, and a synchronous subscription event would otherwise
+          // re-enter this function while `revealed` is still false and open twice.
           revealed = true
+          child.uiWorkspace.openSession(target as SessionId)
         } catch {
+          revealed = false
           // The id can appear between the snapshot and the call; retry the wait
           // instead of spamming openSession.
           if (Date.now() < deadline) schedule(150)
