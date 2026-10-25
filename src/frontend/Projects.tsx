@@ -2,20 +2,21 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { EMPTY } from '../shared/model.js'
 import type { Board, Card, Project, Snapshot } from '../shared/model.js'
 import type { Command } from '../shared/commands.js'
-import { ArchiveBadge } from './ArchiveBadge.js'
 import type { DashboardClient } from './client.js'
-import { useDashboardLocale, useTranslator } from './i18n.js'
+import { useTranslator } from './i18n.js'
 import { Modal } from './Modal.js'
 import { ColorField, validColor } from './ColorField.js'
 import { NATIVE_SIDEBAR_DRAG_TYPE, parseNativeSidebarDrag } from './native-sidebar.js'
 import { PROJECT_DRAG_TYPE, parseProjectDrag, type ProjectDrag } from './project-drag.js'
-import { StateControl } from './StateControl.js'
+import { SessionRow } from './SessionRow.js'
 import { useProjectTranslator } from './project-locales.js'
-import { Popover } from './Popover.js'
-import { SessionRowHead, type RowActionHandlers } from './RowActions.js'
-import { attentionDetail, attentionLabel, attentionTone, effectiveTags, formatTime, needsAction, runningElapsedStart, statusActivityOrder, statusBucketLabel, terminalOutcome, valueText } from './view-model.js'
-import { FilterSelector, STATUS_DIMENSION, matchesFilter, selectedCount, type FilterSelections } from './FilterSelector.js'
-import { RunningElapsed } from './Elapsed.js'
+import { CaretIcon, GripIcon, Popover } from './Popover.js'
+import type { RowActionHandlers } from './RowActions.js'
+import { needsAction, statusActivityOrder, statusBucketLabel } from './view-model.js'
+import { filterRows, matchesFilter, selectedCount, STATUS_DIMENSION, type FilterSelections } from './filter-model.js'
+import { DimensionPicker, FilterBar, readBoardView, writeBoardView, type BoardView } from './BoardBar.js'
+import { DimensionBoard } from './DimensionBoard.js'
+import { PROJECT_DIMENSION, dimensionBuckets, dimensionName } from './board-dimensions.js'
 
 export interface PendingProjectJoin { token: string; sessionId: string; projectId: string; title: string; phase: 'joining' | 'confirming' }
 interface OverviewProps {
@@ -55,26 +56,6 @@ const DRAG_THRESHOLD = 5
 /** Drop-side detection happens inside the card header, not the tall expanded panel. */
 const EDGE_ZONE = 64
 const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, index) => id === b[index])
-/** One session inside a project's dropdown: compact, readable at panel width. The
- *  title owns the preview entry point; details live behind the row's own menu. */
-function ProjectSessionRow({ board, card, onPreview, onChangeState, onReviewState, actions, facets, badge, menu }: { board: Board; card: Card; onPreview: (card: Card) => void; onChangeState?: (card: Card, statusId: string | null) => void | Promise<void>; onReviewState?: (card: Card, statusId: string | null) => void | Promise<void>; actions?: RowActionHandlers; facets?: (card: Card) => ReactNode; badge?: (card: Card, occurrence: string) => ReactNode; menu?: (card: Card, occurrence: string) => ReactNode }) {
-  const { t, active } = useDashboardLocale(), tags = effectiveTags(board, card)
-  // The row hides the chip's own label to keep 128px, so the concrete system outcome
-  // (interrupted / failed / stopped) gets its own short visible label here.
-  // A terminal system result is already the chip's own text, so the row does not
-  // repeat it; other attention (input/approval/resume/sync) still gets its label.
-  const mark = terminalOutcome(card) === null ? attentionLabel(card, t) : null, markDetail = attentionDetail(card, t)
-  const elapsedStart = runningElapsedStart(card), rowTime = formatTime(card.activityAt ?? card.joinedAt, active, t)
-  return <article className="sd-projectrow" data-card-id={card.sessionId}>
-    <SessionRowHead card={card} titleClassName="sd-projectrow-title" onOpen={() => onPreview(card)} actions={actions}/>
-    <div className="sd-row sd-small sd-muted">
-      <StateControl board={board} card={card} onChangeState={onChangeState} onReviewState={onReviewState} />{mark && <span className="sd-attentioninline" data-tone={attentionTone(card) ?? undefined} title={t('attentionMarkTitle', { reason: markDetail ?? mark })}>{mark}</span>}{facets?.(card)}{badge?.(card, `row:${card.membershipId}`)}
-      <span>· {elapsedStart === null ? rowTime : <RunningElapsed startedAt={elapsedStart} text={time => t('elapsedRunning', { time })} title={t('elapsedHint', { start: formatTime(elapsedStart, active, t), last: rowTime })}/>}</span>
-    </div>
-    {card.progress && <p className="sd-small sd-muted sd-projectrow-progress">{card.progress}</p>}
-    <div className="sd-row"><ArchiveBadge value={card.hostArchive}/>{tags.slice(0, 3).map(id => <span className="sd-tag" key={id}>{valueText(board, 'tag', id, t)}</span>)}{tags.length > 3 && <span className="sd-small sd-muted">+{tags.length - 3}</span>}{menu?.(card, `row:${card.membershipId}`)}</div>
-  </article>
-}
 function dragSource(event: DragEvent): ProjectDrag | null {
   if (event.dataTransfer.types.includes(PROJECT_DRAG_TYPE)) return parseProjectDrag(event.dataTransfer.getData(PROJECT_DRAG_TYPE))
   if (!event.dataTransfer.types.includes(NATIVE_SIDEBAR_DRAG_TYPE)) return null
@@ -139,7 +120,7 @@ function SessionBucket({ bucket, title, hint, cards, board, onPreview, onChangeS
       {hint !== undefined && <span className="sd-small sd-muted">{hint}</span>}
     </div>
     {open && <div className="sd-projectdrop-list" id={regionId}>
-      {cards.map(card => <ProjectSessionRow key={card.membershipId} board={board} card={card} onPreview={onPreview} onChangeState={onChangeState} onReviewState={onReviewState} actions={actions} facets={facets} badge={badge} menu={menu}/>)}
+      {cards.map(card => <SessionRow key={card.membershipId} board={board} card={card} onPreview={onPreview} onChangeState={onChangeState} onReviewState={onReviewState} actions={actions} facets={facets} badge={badge} menu={menu}/>)}
     </div>}
   </section>
 }
@@ -148,6 +129,14 @@ export function ProjectOverview({ board, onOpenSession, onPreviewSession, onJoin
   const [over, setOver] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<string[]>([])
   const [selections, setSelections] = useState<FilterSelections>({})
+  // Grouping and filter-category collapse are presentation: this browser remembers
+  // them like the row heights, and the durable board is untouched.
+  const [view, setView] = useState<BoardView>(readBoardView)
+  const setDimension = (dimension: string) => setView(current => { const next = { ...current, dimension }; writeBoardView(next); return next })
+  const toggleCategory = (key: string) => setView(current => {
+    const closed = current.closed.includes(key) ? current.closed.filter(value => value !== key) : [...current.closed, key]
+    const next = { ...current, closed }; writeBoardView(next); return next
+  })
   const [columns, setColumns] = useState(1)
   const [drag, setDrag] = useState<ProjectDragState | null>(null)
   const [pendingOrder, setPendingOrder] = useState<string[] | null>(null)
@@ -422,10 +411,10 @@ export function ProjectOverview({ board, onOpenSession, onPreviewSession, onJoin
           onKeyDown={event => {
             if (event.key !== 'ArrowLeft' && event.key !== 'ArrowUp' && event.key !== 'ArrowRight' && event.key !== 'ArrowDown') return
             event.preventDefault(); event.stopPropagation(); nudgeProject(project, event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1)
-          }}><span aria-hidden="true">⠿</span></button>
+          }}><GripIcon/></button>
         <h3>
           <button type="button" ref={node => { if (node) triggers.current.set(project.id, node); else triggers.current.delete(project.id) }} className="sd-projecttoggle" aria-expanded={open} aria-controls={regionId} title={project.name} onClick={() => toggle(project)}>
-            <span className="sd-projecttoggle-caret" aria-hidden="true">▸</span>
+            <CaretIcon className="sd-projecttoggle-caret"/>
             {project.color && <span className="sd-dot" style={{ background: project.color }} aria-hidden="true"/>}
             <span className="sd-projectname">{project.name}</span>
           </button>
@@ -439,7 +428,7 @@ export function ProjectOverview({ board, onOpenSession, onPreviewSession, onJoin
       </div>
       {open && <div className="sd-projectdrop" id={regionId} role="region" aria-label={`${project.name} · ${t('membersCount', { count: roster.length })}`} tabIndex={-1} data-project-drop={project.id}
         onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); collapse(project) } }}>
-        <div className="sd-projectdrop-list">{joining.map(join => <div className="sd-projectrow sd-projectrow-pending" key={join.token} role="status" aria-busy="true"><span className="sd-projectrow-title">{join.title}</span><span className="sd-small sd-muted">{t(join.phase === 'confirming' ? 'confirmingJoin' : 'joiningProject')}</span></div>)}{roster.length ? roster.map(row => <ProjectSessionRow key={row.membershipId} board={board} card={row} onPreview={previewSession} onChangeState={onChangeState} onReviewState={onReviewState} actions={rowActions} facets={facets} badge={extensions?.badge} menu={extensions?.menu}/>) : joining.length === 0 ? <p className="sd-small sd-muted sd-projectdrop-empty">{t('noMembers')}</p> : null}</div>
+        <div className="sd-projectdrop-list">{joining.map(join => <div className="sd-projectrow sd-projectrow-pending" key={join.token} role="status" aria-busy="true"><span className="sd-projectrow-title">{join.title}</span><span className="sd-small sd-muted">{t(join.phase === 'confirming' ? 'confirmingJoin' : 'joiningProject')}</span></div>)}{roster.length ? roster.map(row => <SessionRow key={row.membershipId} board={board} card={row} onPreview={previewSession} onChangeState={onChangeState} onReviewState={onReviewState} actions={rowActions} facets={facets} badge={extensions?.badge} menu={extensions?.menu}/>) : joining.length === 0 ? <p className="sd-small sd-muted sd-projectdrop-empty">{t('noMembers')}</p> : null}</div>
         {project.tagIds.length > 0 && <div className="sd-projectdrop-foot"><span className="sd-row sd-projectdrop-tags" aria-label={t('publicTags')}>{project.tagIds.slice(0, 2).map(id => { const tag = board.tags.find(value => value.id === id); return tag ? <span key={id} className="sd-tag">{tag.name}</span> : null })}{project.tagIds.length > 2 && <span className="sd-small sd-muted">+{project.tagIds.length - 2}</span>}</span></div>}
       </div>}
     </article>
@@ -449,15 +438,22 @@ export function ProjectOverview({ board, onOpenSession, onPreviewSession, onJoin
   const byActivity = (left: Card, right: Card) => (right.activityAt ?? right.joinedAt) - (left.activityAt ?? left.joinedAt)
   // The same selection narrows the two bottom buckets, so a tag or status filter is
   // a view of every session list, not just the project cards.
+  // Every non-archived session is grouped, including project-less ones: the
+  // unassigned bucket belongs to the project dimension only.
+  const dimensionCards = statusActivityOrder(board, board.cards.filter(card => card.archivedAt === null && (!filtering || matchesFilter(board, card, selections))))
+  const buckets = view.dimension === PROJECT_DIMENSION ? [] : dimensionBuckets(board, dimensionCards, view.dimension, t)
   const unassignedCards = board.cards.filter(card => card.projectId === null && card.archivedAt === null && (!filtering || matchesFilter(board, card, selections))).sort(byActivity)
   const archivedCards = board.cards.filter(card => card.archivedAt !== null && (!filtering || matchesFilter(board, card, selections))).sort(byActivity)
   /** A status-only selection keeps the precise old sentence; any wider selection
    *  reports how many values are narrowing the grid. */
   const selected = Object.entries(selections).filter(([, ids]) => ids.length > 0)
   const singleStatus = selected.length === 1 && selected[0][0] === STATUS_DIMENSION && selected[0][1].length === 1 ? selected[0][1][0] : null
-  const filterHint = !filtering ? t('projectGridHint') : singleStatus === null
-    ? t('filterApplied', { count: selectedCount(selections) })
-    : t('statusFilterHint', { name: statusBucketLabel(board, singleStatus, t) })
+  const grouped = view.dimension !== PROJECT_DIMENSION
+  const filterHint = filtering
+    ? singleStatus === null
+      ? t('filterApplied', { count: selectedCount(selections) })
+      : t('statusFilterHint', { name: statusBucketLabel(board, singleStatus, t) })
+    : grouped ? t('dimensionHintText', { name: dimensionName(board, view.dimension, t) }) : t('projectGridHint')
   const clearSelectionFilter = () => {
     setSelections({})
     // The clear control unmounts with the empty state; return focus to the first
@@ -465,14 +461,21 @@ export function ProjectOverview({ board, onOpenSession, onPreviewSession, onJoin
     setTimeout(() => grid.current?.querySelector<HTMLElement>('.sd-projectcard .sd-projecttoggle')?.focus({ preventScroll: true }), 0)
   }
   return <section className="sd-stack" aria-label={t('projectsHome')}>
-    <div className="sd-between sd-overviewhead"><h2>{t('projectsHome')}</h2>
-      <FilterSelector board={board} cards={board.cards} selections={selections} onChange={setSelections} onManageTags={onManageTags}/>
+    <div className="sd-boardbar">
+      <DimensionPicker board={board} dimension={view.dimension} onChange={setDimension}/>
+      <FilterBar board={board} cards={board.cards} selections={selections} closed={view.closed} onChange={setSelections} onToggleCategory={toggleCategory}
+        onExpandAll={() => setView(current => { const next = { ...current, closed: [] }; writeBoardView(next); return next })}
+        onCollapseAll={() => setView(current => { const next = { ...current, closed: filterRows(board, board.cards).map(row => row.key) }; writeBoardView(next); return next })}
+        onManageTags={onManageTags}/>
     </div>
-    {(filtering || projects.length > 0) && <p className="sd-small sd-muted sd-projecthint" role="status">{filterHint}</p>}
-    {!projects.length && (filtering
+    {(filtering || grouped || projects.length > 0) && <p className="sd-small sd-muted sd-projecthint" role="status">{filterHint}</p>}
+    {!grouped && !projects.length && (filtering
       ? unassignedCards.length === 0 && archivedCards.length === 0 && <div className="sd-empty sd-stack"><h3 aria-live="polite">{t('noStatusFilterMatches')}</h3><p>{t('noStatusFilterHint')}</p><button type="button" className="sd-small" onClick={clearSelectionFilter}>{t('clearFiltersEmpty')}</button></div>
       : board.projects.length === 0 && <div className="sd-empty sd-stack"><h3>{t('noProjects')}</h3><p>{t('noProjectsHint')}</p></div>)}
-    <div className="sd-projectgrid" ref={grid}>
+    {grouped && (buckets.length > 0
+      ? <DimensionBoard board={board} dimension={view.dimension} buckets={buckets} onPreview={card => { if (onPreviewSession) onPreviewSession(card); else if (onOpenSession) onOpenSession(card) }} onChangeState={onChangeState} onReviewState={onReviewState} actions={rowActions} facets={facets} badge={extensions?.badge} menu={extensions?.menu}/>
+      : <div className="sd-empty sd-stack"><h3 aria-live="polite">{t('dimensionEmpty')}</h3><p>{t('dimensionEmptyHint')}</p></div>)}
+    {!grouped && <div className="sd-projectgrid" ref={grid}>
       {rows.map((row, index) => {
         const rowProjects = row.flatMap(tile => tile.kind === 'project' ? [tile.project] : [])
         const allOpen = rowProjects.length > 0 && rowProjects.every(isOpen)
@@ -492,12 +495,12 @@ export function ProjectOverview({ board, onOpenSession, onPreviewSession, onJoin
                 if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
                 event.preventDefault(); event.stopPropagation()
                 nudgeRowHeight(rowKey, event.key === 'ArrowDown' ? 24 : -24)
-              }}><span aria-hidden="true">⠿</span></button>
+              }}><GripIcon/></button>
           </div>}
         </div>
       })}
-    </div>
-    <SessionBucket bucket="unassigned" title={t('unassignedBucket')} hint={t('bucketHint')} cards={unassignedCards} board={board} onPreview={card => { if (onPreviewSession) onPreviewSession(card); else if (onOpenSession) onOpenSession(card) }} onChangeState={onChangeState} onReviewState={onReviewState} actions={rowActions} facets={facets} badge={extensions?.badge} menu={extensions?.menu}/>
+    </div>}
+    {!grouped && <SessionBucket bucket="unassigned" title={t('unassignedBucket')} hint={t('bucketHint')} cards={unassignedCards} board={board} onPreview={card => { if (onPreviewSession) onPreviewSession(card); else if (onOpenSession) onOpenSession(card) }} onChangeState={onChangeState} onReviewState={onReviewState} actions={rowActions} facets={facets} badge={extensions?.badge} menu={extensions?.menu}/>}
     <SessionBucket bucket="archive" title={t('archiveBucket')} cards={archivedCards} board={board} onPreview={card => { if (onPreviewSession) onPreviewSession(card); else if (onOpenSession) onOpenSession(card) }} onChangeState={onChangeState} onReviewState={onReviewState} actions={rowActions} facets={facets} badge={extensions?.badge} menu={extensions?.menu}/>
     {drag?.active && <div ref={cancelZone} className="sd-projectcancel" data-active={drag.cancel ? 'true' : undefined}>
       <span className="sd-projectcancel-icon" aria-hidden="true">×</span>

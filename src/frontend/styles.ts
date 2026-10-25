@@ -250,7 +250,7 @@ export const dashboardCss = `
 .sd-root .sd-projecttoggle{display:flex;align-items:center;justify-content:flex-start;gap:6px;width:100%;min-height:0;padding:1px 3px;margin-left:-3px;border:1px solid transparent;border-radius:var(--sd-radius-sm);background:transparent;color:var(--sd-text);font-weight:620;text-align:left;min-width:0}
 .sd-root .sd-projecttoggle:hover:not(:disabled){background:var(--sd-surface);border-color:var(--sd-border);color:var(--sd-accent-ink)}
 .sd-projectname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sd-projecttoggle-caret{display:inline-flex;align-items:center;justify-content:center;width:10px;flex:none;font-size:9px;line-height:1;color:var(--sd-faint);transition:transform .12s ease}
+.sd-projecttoggle-caret{display:inline-flex;align-items:center;justify-content:center;width:10px;height:10px;flex:none;color:var(--sd-faint);transition:transform .12s ease}
 .sd-projecttoggle[aria-expanded=true] .sd-projecttoggle-caret{transform:rotate(90deg)}
 /* sessions area: same width as its project tile, a fixed height, and internal scrolling.
    It is the deliberately frameless part of the dropdown; the tile border frames it. */
@@ -404,6 +404,27 @@ button.sd-facet[data-open=true]{border-color:var(--sd-accent);color:var(--sd-acc
 .sd-filterrow{display:flex;flex-direction:column;gap:4px;padding-bottom:6px;border-bottom:1px solid var(--sd-border)}
 .sd-filterrow:last-of-type{border-bottom:0}
 .sd-filterrow h4{margin:0;font-size:10.5px;font-weight:600;letter-spacing:.02em;color:var(--sd-faint)}
+/* The board bar replaces the old title row: a dimension picker plus the filter
+   categories, spread across the page instead of hidden behind one popover. */
+.sd-boardbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;width:100%;padding:0 0 6px;border-bottom:1px solid var(--sd-border)}
+.sd-dimension{display:flex;align-items:center;gap:6px;min-width:0}
+.sd-root button.sd-dimensiontrigger{display:inline-flex;align-items:center;gap:6px;min-height:0;height:auto;padding:2px 8px;border:1px solid var(--sd-border);border-radius:99px;background:var(--sd-surface);font-size:12px;color:var(--sd-text)}
+.sd-root button.sd-dimensiontrigger:hover:not(:disabled){border-color:var(--sd-border-strong);background:var(--sd-surface-2)}
+.sd-dimensioncaret{flex:none;color:var(--sd-faint);transform:rotate(90deg)}
+.sd-dimensioncheck{margin-left:4px;color:var(--sd-accent)}
+.sd-filterbar{display:contents}
+.sd-filterbar .sd-filtermeta{order:1;flex:0 1 auto;margin:0 0 0 auto}
+.sd-filtercats{order:3;flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px 16px;min-width:0}
+.sd-filtercat{order:3;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;max-width:100%}
+.sd-root button.sd-filtercat-head{display:inline-flex;align-items:center;justify-content:flex-start;text-align:left;gap:6px;min-height:0;height:auto;padding:1px 3px;border:1px solid transparent;border-radius:var(--sd-radius-sm);background:transparent;font-size:11px;font-weight:600;color:var(--sd-faint)}
+.sd-root button.sd-filtercat-head:hover:not(:disabled){background:var(--sd-surface);color:var(--sd-text)}
+.sd-filtercat-caret{flex:none;color:var(--sd-faint);transition:transform .12s ease}
+.sd-filtercat[data-open=true] .sd-filtercat-caret{transform:rotate(90deg)}
+.sd-filtercat-name{color:var(--sd-text)}
+.sd-filtervalues{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-width:0;max-width:100%}
+.sd-filterfoot{order:2;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sd-valuegrid{display:flex;flex-wrap:wrap;gap:var(--sd-3);min-width:0}
+.sd-valuecard .sd-projectdrop{height:auto;max-height:var(--sd-row-drop-height,300px)}
 .sd-filtermeta{margin:0}
 .sd-root button.sd-statuscount:disabled{opacity:.45;cursor:default}
 .sd-status:before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex:none;opacity:.85}

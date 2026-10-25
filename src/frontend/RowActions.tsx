@@ -2,7 +2,7 @@ import { useState, type DragEvent } from 'react'
 import type { Card } from '../shared/model.js'
 import { displayTitle } from '../shared/model.js'
 import { running } from './view-model.js'
-import { Popover } from './Popover.js'
+import { GripIcon, Popover } from './Popover.js'
 import { useDashboardLocale } from './i18n.js'
 
 /** What a row action reports back: a failed action keeps the row's input and
@@ -59,7 +59,7 @@ export function SessionRowHead({ card, titleClassName, onOpen, actions }: {
       aria-label={archived ? t('rowMoveArchived') : t('rowMoveDrag', { title: displayTitle(card) })}
       title={archived ? t('rowMoveArchived') : t('rowMoveDrag', { title: displayTitle(card) })}
       onDragStart={event => { if (pending || editing || archived) { event.preventDefault(); return } actions?.onMoveDrag?.(card, event) }}>
-      <span aria-hidden="true">⠿</span>
+      <GripIcon/>
     </button>}
     {editing
       ? <form className="sd-rowedit" onSubmit={event => { event.preventDefault(); void saveTitle() }}>

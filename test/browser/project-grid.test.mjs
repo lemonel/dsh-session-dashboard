@@ -555,7 +555,6 @@ test('a status summary chip filters exactly its own project bucket and a second 
   await h.setEntry('projects')
   await h.openDashboard()
   const { page } = h
-  await page.getByRole('button', { name: '筛选', exact: true }).click()
   const summary = page.getByRole('group', { name: '筛选', exact: true })
   const chip = summary.locator('[data-status-count="in_progress"]'), waitingChip = summary.locator('[data-status-count="pending_confirm"]'), unsetChip = summary.locator('[data-status-count="unset"]')
   await chip.waitFor()
@@ -575,13 +574,13 @@ test('a status summary chip filters exactly its own project bucket and a second 
     assert(['flex', 'inline-flex'].includes(value.display), 'as a flex item the chip blockifies inline-flex, but it stays a chip and not a block button')
   }
   const layout = await page.evaluate(() => {
-    const head = document.querySelector('.sd-overviewhead').getBoundingClientRect(), trigger = document.querySelector('.sd-filtertrigger').getBoundingClientRect()
+    const filter = document.querySelector('.sd-filtercats').getBoundingClientRect(), board = document.querySelector('.sd-stack').getBoundingClientRect()
     return {
-      headRight: head.right, triggerRight: trigger.right,
-      boxes: [...document.querySelectorAll('.sd-filterpanel .sd-statuscount')].map(node => ({ height: node.getBoundingClientRect().height, width: node.getBoundingClientRect().width, scrollWidth: node.scrollWidth })),
+      filterWidth: filter.width, boardWidth: board.width,
+      boxes: [...document.querySelectorAll('.sd-filterbar .sd-statuscount')].map(node => ({ height: node.getBoundingClientRect().height, width: node.getBoundingClientRect().width, scrollWidth: node.scrollWidth })),
     }
   })
-  assert(Math.abs(layout.headRight - layout.triggerRight) <= 1, `the selector stays right-aligned in the overview head (${JSON.stringify(layout)})`)
+  assert(Math.abs(layout.filterWidth - layout.boardWidth) <= 1, `the filter bar spans the board instead of a popover (${JSON.stringify(layout)})`)
   for (const box of layout.boxes) {
     assert(box.height >= 12 && box.height <= 22, `the button keeps the compact pill height (${JSON.stringify(box)})`)
     assert(box.scrollWidth <= box.width + 1, `the button never clips its status name or count (${JSON.stringify(box)})`)
@@ -646,12 +645,11 @@ test('the filter selector Shift-multi-selects inside a dimension and ANDs dimens
   await h.setEntry('projects')
   await h.openDashboard()
   const { page } = h
-  await page.getByRole('button', { name: '筛选', exact: true }).click()
   const panel = page.getByRole('group', { name: '筛选', exact: true })
   const run = panel.locator('[data-status-count="in_progress"]'), waiting = panel.locator('[data-status-count="pending_confirm"]')
   const shown = () => page.evaluate(() => [...document.querySelectorAll('.sd-projectcard')].map(card => card.dataset.projectId).sort())
   const waitFor = count => page.waitForFunction(value => document.querySelectorAll('.sd-projectcard').length === value, count)
-  const badge = () => page.locator('.sd-filtertrigger [data-filter-count]')
+  const badge = () => page.locator('[data-filter-category="status"] [data-category-count]')
 
   await run.click()
   await waitFor(2)
@@ -660,14 +658,14 @@ test('the filter selector Shift-multi-selects inside a dimension and ANDs dimens
   await waitFor(3)
   assert.equal(await run.getAttribute('aria-pressed'), 'true')
   assert.equal(await waiting.getAttribute('aria-pressed'), 'true')
-  assert.equal(await badge().getAttribute('data-filter-count'), '2', 'the trigger reports how many values are active')
+  assert.equal(await badge().getAttribute('data-category-count'), '2', 'the category reports how many of its values are active')
   assert.equal(await badge().textContent(), '2')
 
   await run.click()
   await waitFor(2)
   assert.equal(await run.getAttribute('aria-pressed'), 'true', 'a plain press replaces the selection in that dimension')
   assert.equal(await waiting.getAttribute('aria-pressed'), 'false')
-  assert.equal(await badge().getAttribute('data-filter-count'), '1')
+  assert.equal(await badge().getAttribute('data-category-count'), '1')
 
   await run.click({ modifiers: ['Shift'] })
   await waitFor(3)
@@ -698,7 +696,6 @@ test('a terminal card and the status summary share one visible status', async t 
   await h.setEntry('projects')
   await h.openDashboard()
   const { page } = h
-  await page.getByRole('button', { name: '筛选', exact: true }).click()
   const summary = page.getByRole('group', { name: '筛选', exact: true })
   const stoppedChip = summary.locator('[data-status-count="terminal:stopped"]')
   await stoppedChip.waitFor()
@@ -712,4 +709,79 @@ test('a terminal card and the status summary share one visible status', async t 
   assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.sd-projectrow')].map(row => row.dataset.cardId)), ['terminal-stopped'])
   await stoppedChip.click()
   await page.waitForFunction(() => document.querySelectorAll('.sd-projectcard').length === 2)
+})
+
+test('the dimension picker regroups value cards by status and by a tag group', async t => {
+  const h = await createFixture(t, runtime, 'dimension-picker', { viewport: { width: 1400, height: 900 } })
+  const [alpha, beta] = await createProjects(h, ['Dim Alpha', 'Dim Beta'])
+  await h.mutate({ type: 'create_tag_group', name: 'Priority 优先级', color: null })
+  const group = h.board().tagGroups.find(value => value.name === 'Priority 优先级')
+  await h.mutate({ type: 'create_label', dimension: 'tag', groupId: group.id, name: 'P1', color: null })
+  await h.mutate({ type: 'create_label', dimension: 'tag', groupId: group.id, name: 'P2', color: null })
+  const p1 = h.board().tags.find(tag => tag.name === 'P1')
+  h.host.set('dim-a', sessionObservation('Alpha running', 'running'), false)
+  await h.join('dim-a', alpha.id)
+  h.host.set('dim-b', sessionObservation('Beta done', 'completed'), false)
+  await h.join('dim-b', beta.id)
+  h.host.set('dim-c', sessionObservation('Tagged work', 'not_started'), false)
+  await h.join('dim-c', beta.id)
+  const tagged = h.card('dim-c')
+  await h.mutate({ type: 'edit_card', sessionId: 'dim-c', membershipId: tagged.membershipId, expectedMetadataRevision: tagged.metadataRevision, tagIds: [p1.id], titleOverride: tagged.titleOverride, progress: tagged.progress })
+  await openOverview(h)
+  const { page } = h
+  const pick = async name => {
+    await page.getByRole('button', { name: '分组维度', exact: true }).click()
+    await page.getByRole('menuitemradio', { name: `分组维度: ${name}`, exact: true }).click()
+  }
+  const keys = () => page.evaluate(() => [...document.querySelectorAll('.sd-valuecard')].map(node => node.dataset.valueKey))
+  const rowsOf = key => page.evaluate(value => [...document.querySelectorAll(`.sd-valuecard[data-value-key="${value}"] .sd-projectrow`)].map(row => row.dataset.cardId), key)
+
+  await pick('状态')
+  await page.locator('.sd-valuegrid').waitFor()
+  assert.deepEqual(await keys(), ['in_progress', 'pending_confirm', 'unset'], 'one value card per status bucket, in the configured order')
+  assert.deepEqual(await rowsOf('in_progress'), ['dim-a'])
+  assert.deepEqual(await rowsOf('pending_confirm'), ['dim-b'])
+  assert.deepEqual(await rowsOf('unset'), ['dim-c'], 'a not-started session has no status yet, so it lands in the unset card')
+  assert.equal(await page.locator('.sd-projectgrid').count(), 0, 'the project grid is replaced, not duplicated')
+  assert.equal(await page.locator('.sd-ghostcard').count(), 0, 'creating a project belongs to the project dimension')
+
+  await pick('Priority 优先级')
+  await page.waitForFunction(() => document.querySelectorAll('.sd-valuecard').length === 2)
+  assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('.sd-valuecard')].map(node => [node.dataset.valueKey, node.getAttribute('aria-label')])), [[p1.id, 'P1'], ['unset', '未设置']], 'a value with no sessions is not a card, and the unset remainder is last')
+  assert.deepEqual(await rowsOf('unset'), ['dim-a', 'dim-b'], 'sessions without a value in this group land in the unset card')
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('session-dashboard.board-view')).dimension), group.id, 'the chosen dimension is remembered in this browser')
+
+  await pick('项目')
+  await page.locator('.sd-projectgrid').waitFor()
+  assert.equal(await page.locator('.sd-valuecard').count(), 0)
+  assert.equal(await page.locator('.sd-ghostcard').count(), 1, 'the create-project entry returns with the project dimension')
+})
+
+test('filter categories collapse to their category name and the choice survives a reload', async t => {
+  const h = await createFixture(t, runtime, 'filter-collapse', { viewport: { width: 1200, height: 900 } })
+  const [only] = await createProjects(h, ['Collapse project'])
+  h.host.set('collapse-a', sessionObservation('Collapse A', 'running'), false)
+  await h.join('collapse-a', only.id)
+  h.host.set('collapse-b', sessionObservation('Collapse B', 'completed'), false)
+  await h.join('collapse-b', only.id)
+  await openOverview(h)
+  const { page } = h
+  const status = page.locator('[data-filter-category="status"]')
+  const chips = status.locator('.sd-statuscount')
+  assert.equal(await chips.count(), 2, 'values are expanded by default')
+  await status.getByRole('button', { name: '收起「状态」的取值', exact: true }).click()
+  assert.equal(await chips.count(), 0, 'collapsing hides the enum values')
+  assert.equal(await status.locator('.sd-filtercat-name').textContent(), '状态', 'the category name stays visible')
+  assert.equal((await status.textContent()).replace(/\s+/g, ''), '状态2', 'the collapsed category still reports how many values it holds')
+
+  await page.reload()
+  await page.waitForFunction(() => Boolean(window.dashboardFixture?.slots))
+  await page.locator('[data-fixture-nav="session-dashboard"]').click()
+  await page.locator('[data-filter-category="status"]').waitFor()
+  assert.equal(await page.locator('[data-filter-category="status"] .sd-statuscount').count(), 0, 'the collapsed choice survives a reload')
+  await page.getByRole('button', { name: '展开「状态」的取值', exact: true }).click()
+  assert.equal(await page.locator('[data-filter-category="status"] .sd-statuscount').count(), 2, 'expanding brings the values back')
+  await page.locator('[data-filter-category="status"] .sd-statuscount').first().click()
+  await page.waitForFunction(() => document.querySelectorAll('.sd-projectcard').length === 1)
+  assert.equal(await page.locator('[data-filter-category="status"] [data-category-count]').getAttribute('data-category-count'), '1', 'the category reports its own active values')
 })

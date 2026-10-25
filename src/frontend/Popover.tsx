@@ -41,6 +41,13 @@ export function Popover({ label, children, align = 'end', disabled = false, clos
 export function MoreIcon() {
   return <svg className="sd-more" aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.4" r="1.75"/><circle cx="12" cy="12" r="1.75"/><circle cx="12" cy="18.6" r="1.75"/></svg>
 }
-export function FilterIcon() {
-  return <svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
+/** A small disclosure chevron; a path instead of a text glyph so it renders the
+ *  same in every font (the isolated fixture only ships a CJK subset). */
+export function CaretIcon({ className = 'sd-caret' }: { className?: string }) {
+  return <svg className={className} aria-hidden="true" focusable="false" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+}
+/** The drag handle: six dots as a path, so it never depends on a font shipping
+ *  the braille pattern glyph. */
+export function GripIcon({ className = 'sd-grip' }: { className?: string }) {
+  return <svg className={className} aria-hidden="true" focusable="false" width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="7" cy="3" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="11" r="1.2"/><circle cx="7" cy="11" r="1.2"/></svg>
 }

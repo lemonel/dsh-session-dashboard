@@ -128,13 +128,9 @@ test('the project overview summarises every project-managed session in status or
   ], 'counts cover unassigned sessions too, in configured status order')
 })
 
-/** The top-right selector is a popover: open it once, then every chip lives in
- *  its panel. Opening again when it is already open would close it. */
-const filterPanel = () => {
-  const trigger = screen.getByRole('button', { name: '筛选', exact: true })
-  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger)
-  return screen.getByRole('group', { name: '筛选', exact: true })
-}
+/** The filter bar lives in the page: every dimension is a category and the value
+ *  chips are expanded by default, so the panel is already there. */
+const filterPanel = () => screen.getByRole('group', { name: '筛选', exact: true })
 const statusChip = (summary, name) => within(summary).getByRole('button', { name: new RegExp(`^${name} · `) })
 const overview = board => localized(React.createElement(ProjectOverview, { board, onOpen() {}, onCreate() {}, onNewSession() {}, onEdit() {}, onDelete() {}, onReorder() {}, onJoin() {} }))
 const shownProjects = () => [...document.querySelectorAll('.sd-projectcard')].map(node => node.getAttribute('aria-label'))

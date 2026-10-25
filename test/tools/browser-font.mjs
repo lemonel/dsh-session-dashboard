@@ -19,7 +19,9 @@ const collect = async directory => {
 await collect('src')
 await collect('test/browser')
 const input = (await Promise.all(files.map(path => readFile(new URL(path, root), 'utf8')))).join('')
-const text = [...new Set(input.match(/[\u3400-\u9fff]/gu))].sort().join('')
+// CJK ideographs plus the CJK punctuation and fullwidth forms the copy uses: a
+// subset without 「」 or ； would fall back to a system font the fixture does not have.
+const text = [...new Set(input.match(/[\u3400-\u9fff\u3000-\u303f\uff00-\uffef]/gu))].sort().join('')
 const cssUrl = `https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400&text=${encodeURIComponent(text)}`
 const css = await fetch(cssUrl).then(response => { if (!response.ok) throw new Error(`Font CSS HTTP ${response.status}`); return response.text() })
 const match = css.match(/src:\s*url\((https:\/\/fonts\.gstatic\.com\/[\w\W]*?)\) format\('(truetype|woff2)'\)/)

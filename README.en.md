@@ -29,7 +29,7 @@ The archive contains runtime output, bundle configuration, an SVG icon and user 
 
 ## First Use
 
-1. Click the dashed **New project** tile on the projects overview. A project is one value of the builtin **Projects** tag group.
+1. With the top **Group by** kept on Project, click the dashed **New project** tile. A project is one value of the builtin **Projects** tag group.
 2. New session asks for a workspace first: the dashboard creates a blank Session, joins it to the current project immediately, and opens it in the native iframe preview where the first message can be sent. An unstarted blank Session in the same workspace is reused; if it belongs to another project, that card is moved here instead of creating another blank.
 3. Join an existing session from the plugin entry in the native sidebar, or drag it onto a project card. The move grip at the left of a session title is only for moving between projects.
 4. Click a session title to preview its conversation in a floating window (read-only; it never starts or resumes an Agent). The preview can go full screen and can open a second session side by side; closing it keeps a bounded cache. Use the row menu for **Session details** when you need the full facts.
@@ -52,12 +52,21 @@ The archive contains runtime output, bundle configuration, an SVG icon and user 
 
 ## Find Sessions That Need You
 
-The **Filters** control at the top right is a general selector. Rows list statuses, projects, each tag group and ungrouped tags with global counts:
+The top of the page holds two controls: **Group by** and **Filters**.
 
+**Group by** decides what the cards below are grouped by. Clicking it lists every dimension — projects, statuses, each tag group and the ungrouped tags. Picking one regroups the cards exactly like the project dimension does:
+
+- Each card is one value (a status, a tag), listing the sessions in it; click its title to collapse or expand it.
+- Sessions with no value in that dimension collect in a final **Not set** card instead of disappearing.
+- Creating a session, renaming/deleting a project and reordering belong to the project dimension; other dimensions are read-only groupings.
+- The dimension and each category's collapsed state are remembered in this browser and survive a reload.
+
+**Filters** sit in the page: one heading per category with its own values and the global count.
+
+- A heading shows the category name, how many values it has and how many are selected; clicking it collapses or expands that category's values (collapsed keeps only the category). **Expand all / Collapse all** adjust every category at once.
 - A plain click keeps only that value in its dimension; clicking the sole selected value clears it.
 - **Shift-click** adds values inside one dimension: values in a group are ORed, different dimensions are ANDed.
-- The trigger shows how many values are active; **Clear all filters** resets everything.
-- Filtering narrows sessions inside project cards, the Unassigned section and the Archived section. Counts cover every non-archived session and never change with the selection.
+- Filtering narrows sessions inside cards, the Unassigned section and the Archived section. Counts cover every non-archived session and never change with the selection.
 - Filtering is a view only: it writes no data and does not change project order or expansion.
 
 ## Review, Conflicts and Safety

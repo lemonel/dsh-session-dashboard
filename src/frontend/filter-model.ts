@@ -1,14 +1,11 @@
-import type { CSSProperties } from 'react'
 import type { Board, Card } from '../shared/model.js'
-import { EMPTY, PROJECT_GROUP_ID, tagGroupOf } from '../shared/model.js'
-import { statusBucket, statusBucketColor, statusBucketLabel, statusSummary } from './view-model.js'
-import { effectiveTagIds } from '../shared/model.js'
-import { useTranslator } from './i18n.js'
-import { FilterIcon, Popover } from './Popover.js'
+import { EMPTY, PROJECT_GROUP_ID, effectiveTagIds, tagGroupOf } from '../shared/model.js'
+import { statusBucket, statusSummary } from './view-model.js'
 
 /** The filter is a map from one dimension to the values picked in it: `status`
  *  for the built-in/custom statuses, a tag group id for its tags, and the
- *  project group id for projects. */
+ *  project group id for projects. The board bar renders these rows; this module
+ *  only decides what a dimension contains and which sessions it matches. */
 export const STATUS_DIMENSION = 'status'
 export const UNGROUPED_DIMENSION = '__ungrouped__'
 export type FilterSelections = Record<string, string[]>
@@ -68,56 +65,4 @@ export function filterRows(board: Board, cards: readonly Card[]): FilterRow[] {
   const ungrouped = orderedTags(null).map(tag => ({ id: tag.id, name: tag.name, color: tag.color, count: members.filter(card => effectiveTagIds(board, card).includes(tag.id)).length }))
   if (ungrouped.length > 0) rows.push({ key: UNGROUPED_DIMENSION, name: '', values: ungrouped })
   return rows
-}
-
-/** The top-right selector: one facet row per dimension, any number of values per
- *  row (Shift-click adds another), and the panel stays open so the reader can
- *  stack dimensions without reopening it. */
-export function FilterSelector({ board, cards, selections, onChange, onManageTags }: {
-  board: Board
-  cards: readonly Card[]
-  selections: FilterSelections
-  onChange: (next: FilterSelections) => void
-  onManageTags?: () => void
-}) {
-  const t = useTranslator()
-  const rows = filterRows(board, cards)
-  const total = cards.filter(card => card.archivedAt === null).length
-  const active = selectedCount(selections)
-  const pick = (key: string, id: string, extend: boolean) => {
-    const ids = selections[key] ?? []
-    const next = extend
-      ? ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id]
-      : ids.length === 1 && ids[0] === id ? [] : [id]
-    onChange({ ...selections, [key]: next })
-  }
-  const label = (row: FilterRow, value: FilterValue, on: boolean): string => row.key === STATUS_DIMENSION
-    ? t(on ? 'statusCountFilterActive' : 'statusCountFilter', { name: statusBucketLabel(board, value.id, t), count: value.count })
-    : t(on ? 'filterValueActive' : 'filterValue', { name: value.name, count: value.count })
-  return <Popover label={t('filters')} align="end" triggerClassName="sd-filtertrigger" panelClassName="sd-filterpanel"
-    trigger={<><FilterIcon/><span>{t('filters')}</span>{active > 0 && <b className="sd-filtercount" data-filter-count={String(active)}>{active}</b>}</>}>
-    <p className="sd-small sd-muted sd-filtermeta" role="status">{t('filterTotal', { count: total })}</p>
-    {rows.map(row => <section className="sd-filterrow" key={row.key} aria-label={row.key === STATUS_DIMENSION ? t('status') : row.key === UNGROUPED_DIMENSION ? t('groupNone') : row.name}>
-      <h4>{row.key === STATUS_DIMENSION ? t('status') : row.key === UNGROUPED_DIMENSION ? t('groupNone') : row.name}</h4>
-      <div className="sd-statuscounts">{row.values.map(value => {
-        const on = (selections[row.key] ?? []).includes(value.id)
-        const text = label(row, value, on)
-        const color = row.key === STATUS_DIMENSION ? statusBucketColor(board, value.id) : value.color
-        return <button type="button" className="sd-statuscount" key={value.id} aria-pressed={on} aria-label={text} title={text}
-          data-filter-value={`${row.key}:${value.id}`} data-status-count={row.key === STATUS_DIMENSION ? value.id : undefined}
-          onClick={event => pick(row.key, value.id, event.shiftKey)} disabled={!on && value.count === 0}
-          style={color === null ? undefined : { '--sd-chip-color': color } as CSSProperties}>
-          <span className="sd-state-name">{row.key === STATUS_DIMENSION ? statusBucketLabel(board, value.id, t) : value.name}</span><b>{value.count}</b>
-        </button>
-      })}</div>
-    </section>)}
-    <p className="sd-small sd-muted">{t('filterHint')}</p>
-    <div className="sd-row sd-between">
-      <span className="sd-small sd-muted">{active === 0 ? t('filterIdle') : t('filterApplied', { count: active })}</span>
-      <div className="sd-row">
-        <button type="button" className="sd-small" disabled={active === 0} onClick={() => onChange({})}>{t('clearFilters')}</button>
-        {onManageTags && <button type="button" className="sd-small" onClick={onManageTags}>{t('manageTags')}</button>}
-      </div>
-    </div>
-  </Popover>
 }
