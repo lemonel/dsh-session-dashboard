@@ -785,3 +785,49 @@ test('filter categories collapse to their category name and the choice survives 
   await page.waitForFunction(() => document.querySelectorAll('.sd-projectcard').length === 1)
   assert.equal(await page.locator('[data-filter-category="status"] [data-category-count]').getAttribute('data-category-count'), '1', 'the category reports its own active values')
 })
+
+test('the project grid keeps its column count after other dimensions and resizes', async t => {
+  const h = await createFixture(t, runtime, 'grid-after-dimension', { viewport: { width: 1400, height: 1000 } })
+  await createProjects(h, Array.from({ length: 6 }, (_, index) => name('Back project', index)))
+  await openOverview(h)
+  const { page } = h
+  const perRow = async () => groupRows(await readGrid(page).then(grid => grid.cards)).size
+  const widestRow = () => page.evaluate(() => {
+    const rows = new Map()
+    for (const card of document.querySelectorAll('.sd-projectcard')) {
+      const box = card.getBoundingClientRect(), top = Math.round(box.top * 2) / 2
+      rows.set(top, (rows.get(top) ?? 0) + 1)
+    }
+    return Math.max(...rows.values())
+  })
+  const before = await perRow()
+  assert.equal(before, 2, 'six 340px tiles at 1400px fill two rows')
+  assert(await widestRow() >= 2, 'the wide viewport puts more than one tile in a row')
+
+  const pick = async label => {
+    await page.getByRole('button', { name: '分组维度', exact: true }).click()
+    await page.getByRole('menuitemradio', { name: `分组维度: ${label}`, exact: true }).click()
+  }
+  // The project grid is unmounted here, so a resize must not be measured against a
+  // detached node: that used to leave the grid at one card per row for good.
+  await pick('状态')
+  await page.waitForFunction(() => document.querySelector('.sd-projectgrid') === null)
+  await page.setViewportSize({ width: 1320, height: 1000 })
+  await page.waitForTimeout(200)
+  await pick('项目')
+  await page.locator('.sd-projectgrid').waitFor()
+  assert.equal(await widestRow(), 3, 'coming back from another dimension restores the measured columns')
+  assert.equal(await perRow(), 2)
+
+  // A real width change afterwards still re-measures the live grid.
+  await page.setViewportSize({ width: 1080, height: 1000 })
+  await page.waitForFunction(() => {
+    const rows = new Map()
+    for (const card of document.querySelectorAll('.sd-projectcard')) {
+      const box = card.getBoundingClientRect(), top = Math.round(box.top * 2) / 2
+      rows.set(top, (rows.get(top) ?? 0) + 1)
+    }
+    return Math.max(...rows.values()) === 2
+  })
+  assert.equal(await perRow(), 3, 'a narrower viewport wraps six tiles onto three rows')
+})

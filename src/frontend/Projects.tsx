@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { EMPTY } from '../shared/model.js'
 import type { Board, Card, Project, Snapshot } from '../shared/model.js'
 import type { Command } from '../shared/commands.js'
@@ -144,7 +144,12 @@ export function ProjectOverview({ board, onOpenSession, onPreviewSession, onJoin
   const heightsRef = useRef(heights); heightsRef.current = heights
   const resizeRef = useRef<{ key: string; y: number; height: number } | null>(null)
   const triggers = useRef(new Map<string, HTMLButtonElement>())
-  const grid = useRef<HTMLDivElement>(null)
+  const grid = useRef<HTMLDivElement | null>(null)
+  // The grid only exists in the project dimension, so it unmounts when another
+  // dimension is shown. A ref object would keep the detached node and measure its
+  // zero width; tracking the node itself re-arms the measurement on every remount.
+  const [gridNode, setGridNode] = useState<HTMLDivElement | null>(null)
+  const attachGrid = useCallback((node: HTMLDivElement | null) => { grid.current = node; setGridNode(node) }, [])
   const cancelZone = useRef<HTMLDivElement>(null)
   const dragRef = useRef<ProjectDragState | null>(null)
   const pendingGripFocus = useRef<string | null>(null)
@@ -207,9 +212,13 @@ export function ProjectOverview({ board, onOpenSession, onPreviewSession, onJoin
   // Explicit row groups make the row control and row-scoped drag feedback possible while the
   // cards themselves keep their fixed 340px width. Widths are measured, never inferred from CSS.
   useLayoutEffect(() => {
-    const node = grid.current
+    const node = gridNode
     if (!node) return
     const measure = () => {
+      // A detached node (the project grid while another dimension is shown) reports
+      // no width. Keeping the last real count is what stops the grid from silently
+      // collapsing to one card per row when the project dimension comes back.
+      if (!node.isConnected || node.clientWidth === 0) return
       const narrow = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 760px)').matches
       const usable = Math.max(0, node.clientWidth - ROW_RAIL - ROW_END_RAIL - ROW_GAP * 2)
       const next = narrow || usable < TILE_WIDTH ? 1 : Math.max(1, Math.floor((usable + ROW_GAP) / (TILE_WIDTH + ROW_GAP)))
@@ -220,7 +229,7 @@ export function ProjectOverview({ board, onOpenSession, onPreviewSession, onJoin
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
     observer?.observe(node)
     return () => { observer?.disconnect(); window.removeEventListener('resize', measure) }
-  }, [])
+  }, [gridNode])
   const anyExpanded = projects.some(isOpen)
   const orderKey = projects.map(project => project.id).join('|')
   // FLIP: capture layout positions before the DOM paints the new order, then replay the
@@ -475,7 +484,7 @@ export function ProjectOverview({ board, onOpenSession, onPreviewSession, onJoin
     {grouped && (buckets.length > 0
       ? <DimensionBoard board={board} dimension={view.dimension} buckets={buckets} onPreview={card => { if (onPreviewSession) onPreviewSession(card); else if (onOpenSession) onOpenSession(card) }} onChangeState={onChangeState} onReviewState={onReviewState} actions={rowActions} facets={facets} badge={extensions?.badge} menu={extensions?.menu}/>
       : <div className="sd-empty sd-stack"><h3 aria-live="polite">{t('dimensionEmpty')}</h3><p>{t('dimensionEmptyHint')}</p></div>)}
-    {!grouped && <div className="sd-projectgrid" ref={grid}>
+    {!grouped && <div className="sd-projectgrid" ref={attachGrid}>
       {rows.map((row, index) => {
         const rowProjects = row.flatMap(tile => tile.kind === 'project' ? [tile.project] : [])
         const allOpen = rowProjects.length > 0 && rowProjects.every(isOpen)
