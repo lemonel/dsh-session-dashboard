@@ -359,23 +359,32 @@ export async function pressOn(page, locator, key) {
   await page.keyboard.press(key)
 }
 
-/** Wait until the control is the element a pointer would actually hit. A preview or
- * New Session overlay that is still opening (or still being dismissed) covers the
- * board for a while on a slow host, and a click sent into it silently goes nowhere. */
-export async function waitUncovered(page, locator) {
-  await locator.scrollIntoViewIfNeeded()
+/** Wait until the control is the element a pointer would actually hit. Two reasons a
+ * control is not: an overlay (a preview or New Session frame still opening or still
+ * being dismissed) covers it, or an ancestor scroller clips it — a clipped element
+ * keeps a viewport rect, so the hit test lands on the clipping container forever. Both
+ * are fixed by scrolling the control into view inside its own scroller and retrying. */
+export async function waitUncovered(page, locator, { timeout = 12000 } = {}) {
   const handle = await locator.elementHandle()
-  await page.waitForFunction(element => {
-    if (!element || !element.isConnected) return false
-    const rect = element.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0) return false
-    const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2
-    // A row far below the fold has no hit point at all; bring it into view first
-    // instead of waiting for an overlay that is not the problem.
-    if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) { element.scrollIntoView({ block: 'center', inline: 'center' }); return false }
-    const hit = document.elementFromPoint(x, y)
-    return Boolean(hit) && (element === hit || element.contains(hit) || hit.contains(element))
-  }, handle)
+  const deadline = Date.now() + timeout
+  for (;;) {
+    const ready = await page.evaluate(element => {
+      if (!element || !element.isConnected) return false
+      const rect = element.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return false
+      const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2
+      const inView = x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight
+      const hit = inView ? document.elementFromPoint(x, y) : null
+      if (hit !== null && (element === hit || element.contains(hit) || hit.contains(element))) return true
+      // Clipped by a scrolling ancestor, hidden behind an overlay or out of view: ask
+      // the browser to bring it to the middle of its scroller and look again.
+      element.scrollIntoView({ block: 'center', inline: 'center' })
+      return false
+    }, handle)
+    if (ready) return
+    if (Date.now() > deadline) throw new Error('waitUncovered: the control never became clickable; something keeps covering it')
+    await page.waitForTimeout(50)
+  }
 }
 
 export async function refresh(h) {
