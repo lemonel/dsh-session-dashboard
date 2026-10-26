@@ -460,17 +460,27 @@ export async function pickWorkspaceAndCreate(h, { title, prompt } = {}) {
 }
 
 /** Close the floating preview if creation opened one. */
-export async function closePreview(page) {
-  // Creation can open the preview slightly after the notice, and a second window may
-  // follow a first close, so keep closing while a visible preview is still up.
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+export async function closePreview(page, { timeout = 10000 } = {}) {
+  // Creation opens the preview asynchronously: it can still arrive after the notice,
+  // and a second window can follow a first close. Require a quiet window with no
+  // visible preview before reporting the board as uncovered, and keep closing while
+  // one is up — a lingering pending frame intercepts every later click.
+  const deadline = Date.now() + timeout
+  let quietSince = null
+  while (Date.now() < deadline) {
     const preview = page.getByRole('dialog', { name: '预览会话', exact: true })
-    if (await preview.count() === 0 || !(await preview.isVisible())) break
-    const close = preview.getByRole('button', { name: '关闭预览会话', exact: true })
-    if (await close.count() === 0) break
-    await close.click()
-    await page.locator('[data-preview-cache]').waitFor({ state: 'hidden' })
-    await settleLayout(page)
+    const visible = await preview.count() > 0 && await preview.isVisible()
+    const close = visible ? preview.getByRole('button', { name: '关闭预览会话', exact: true }) : null
+    if (close !== null && await close.count() > 0) {
+      quietSince = null
+      await close.click()
+      await page.locator('[data-preview-cache]').waitFor({ state: 'hidden' })
+      await settleLayout(page)
+      continue
+    }
+    quietSince ??= Date.now()
+    if (Date.now() - quietSince >= 600) break
+    await page.waitForTimeout(100)
   }
   await page.waitForFunction(() => [...document.querySelectorAll('[data-preview-cache]')].every(node => node.hasAttribute('hidden')))
 }

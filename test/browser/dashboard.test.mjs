@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import {
   addCard, closeDrawer, createBrowserRuntime, createFixture, createLabel, drawer,
   expectCardStatus, expandBucket, mutation, openMenu, openProjectDrop, openRowMenu,
-  openStatePanel, persistedPreferences, refresh, sessionObservation,
+  openStatePanel, persistedPreferences, refresh, sessionObservation, waitUncovered
 } from '../tools/browser-harness.mjs'
 
 let runtime
@@ -16,6 +16,8 @@ const titles = ['Chrome Alpha delivery', 'Chrome Beta running', 'Chrome Gamma cr
 const openCard = async (page, title) => {
   const trigger = page.getByRole('button', { name: `会话行操作：${title}`, exact: true })
   if (await trigger.count() === 0) await expandBucket(page)
+  // A preview or creation overlay still on its way out would swallow the click.
+  await waitUncovered(page, trigger)
   const menu = await openRowMenu(page, title)
   await menu.getByRole('button', { name: '会话详情', exact: true }).click()
   await drawer(page).waitFor()
